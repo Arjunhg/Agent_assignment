@@ -25,7 +25,7 @@ A robust Node.js and Express-based backend API for the ReferBiz referral marketi
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/Agent_assignment.git
+git clone https://github.com/Arjunhg/Agent_assignment.git
 cd Agent_assignment/backend
 ```
 

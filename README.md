@@ -69,7 +69,7 @@ ReferBiz is a full-stack web application that enables businesses to create, mana
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/Agent_assignment.git
+git clone https://github.com/Arjunhg/Agent_assignment.git
 cd Agent_assignment
 ```
 
@@ -150,7 +150,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-Project Link: [https://github.com/yourusername/Agent_assignment](https://github.com/yourusername/Agent_assignment)
+Project Link: [https://github.com/Arjunhg/Agent_assignment](https://github.com/Arjunhg/Agent_assignment)
 
 ## 🙏 Acknowledgements
 

@@ -24,7 +24,7 @@ A modern, React-based frontend for the ReferBiz referral marketing platform. Bui
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/Agent_assignment.git
+git clone https://github.com/Arjunhg/Agent_assignment.git
 cd Agent_assignment/frontend
 ```
 
