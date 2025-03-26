@@ -16,7 +16,7 @@ const app = express();
 app.use(express.json());
 
 app.use(cors({
-  origin: [process.env.FRONTEND_URL, "https://referbiz-lovat.vercel.app/"],
+  origin: [process.env.FRONTEND_URL, "https://referbiz-lovat.vercel.app"],
   credentials: true
 }));
 
