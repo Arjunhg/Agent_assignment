@@ -35,6 +35,7 @@ exports.createReferral = async (req, res, next) => {
     
     // Create the referral link
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const referralLink = `${baseUrl}/refer/${referralCode}`;
 
     const referral = await Referral.create({
