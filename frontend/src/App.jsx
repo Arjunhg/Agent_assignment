@@ -25,6 +25,7 @@ import CampaignAnalytics from "./pages/analytics/CampaignAnalytics";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 import { Box } from "@mui/material";
+import AIAgent from './components/ai/AIAgent';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -86,6 +87,7 @@ const App = () => {
           </Routes>
         </Box>
         <Footer />
+        <AIAgent />
       </Box>
     </Router>
   );

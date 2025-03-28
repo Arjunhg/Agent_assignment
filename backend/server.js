@@ -16,7 +16,7 @@ const app = express();
 app.use(express.json());
 
 app.use(cors({
-  origin: [process.env.FRONTEND_URL, "https://referbiz-lovat.vercel.app"],
+  origin: [process.env.FRONTEND_URL, "https://referbiz-lovat.vercel.app", "http://localhost:5173"],
   credentials: true
 }));
 
@@ -41,6 +41,11 @@ app.use('/api/referrals', require('./routes/referral_routes'));
 app.use('/api/rewards', require('./routes/reward_routes'));
 app.use('/api/messages', require('./routes/message_routes'));
 app.use('/api/analytics', require('./routes/analytics_routes'));
+
+// const aiRoutes = require('./routes/ai_routes');
+
+// Mount routes
+app.use('/api/ai', require('./routes/ai_routes'));
 
 
 app.use((err, req, res, next) => {
