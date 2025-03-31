@@ -54,15 +54,20 @@ const templates = {
 };
 
 // Send email function
-const sendEmail = async (to, template, data) => {
+const sendEmail = async (to, subject, content, template = null, data = []) => {
   try {
-    const { subject, html } = templates[template](...data);
+    // If template and data are provided, use the template system
+    // Otherwise, use the provided subject and content
+    const emailData = template && data ? templates[template](...data) : {
+      subject,
+      html: content
+    };
     
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
       to,
-      subject,
-      html
+      subject: emailData.subject,
+      html: emailData.html
     });
     
     return true;

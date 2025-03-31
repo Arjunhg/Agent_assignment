@@ -28,6 +28,12 @@ import {
   ListItemSecondaryAction,
   Checkbox,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Slider,
+  FormGroup,
 } from '@mui/material';
 import {
   Email as EmailIcon,
@@ -70,6 +76,15 @@ const MessageCreate = () => {
     status: 'draft',
     aiGenerated: false,
   });
+  const [aiCustomization, setAiCustomization] = useState({
+    tone: 'professional',
+    length: 50,
+    keywords: '',
+    customInstructions: ''
+  });
+  const [showAiCustomization, setShowAiCustomization] = useState(false);
+  const [previewName, setPreviewName] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -152,23 +167,88 @@ const MessageCreate = () => {
   };
 
   const handleGenerateAIContent = async () => {
-    setUseAI(true);
+    try {
+      setLoading(true);
+      setUseAI(true);
+      
+      // Get campaign details if selected
+      const campaign = campaigns.find(c => c._id === formData.campaignId);
+      const campaignName = campaign ? campaign.name : 'our referral program';
+      
+      // Prepare the prompt for AI with customization
+      const prompt = `Generate a personalized ${formData.type} message for ${campaignName}. 
+      The message should be engaging and encourage referrals. 
+      Use {{name}} as a placeholder for the recipient's name. 
+      For email, include a subject line. 
+      Tone: ${aiCustomization.tone}
+      Length: ${aiCustomization.length}% (short to long)
+      Keywords to include: ${aiCustomization.keywords}
+      Additional instructions: ${aiCustomization.customInstructions}
+      Format: ${formData.type === 'email' ? 'Subject: [subject]\n\n[content]' : '[content]'}`;
+      
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: prompt }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
+      }
+
+      const data = await response.json();
+      
+      // Split the response into subject and content for email
+      if (formData.type === 'email') {
+        const [subject, ...contentLines] = data.response.split('\n\n');
+        setFormData({
+          ...formData,
+          subject: subject.replace('Subject:', '').trim(),
+          content: contentLines.join('\n\n'),
+          aiGenerated: true
+        });
+      } else {
+        setFormData({
+          ...formData,
+          content: data.response,
+          aiGenerated: true
+        });
+      }
+    } catch (error) {
+      console.error('Error generating AI content:', error);
+      setError('Failed to generate content. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePreview = () => {
+    if (!previewName) return;
+    
+    const previewContent = formData.content.replace(/{{name}}/g, previewName);
+    const previewSubject = formData.subject?.replace(/{{name}}/g, previewName);
+    
     setFormData({
       ...formData,
-      aiGenerated: true,
-      content: `Dear {{name}},
-
-I'm excited to share our new referral program with you! 
-
-When you refer friends or colleagues to our service, you'll receive exclusive rewards. Your referrals also get a special welcome offer, making it a win-win for everyone.
-
-Simply share your personalized referral link with anyone you think would benefit from our services. Each successful referral brings you closer to valuable rewards.
-
-Thank you for being a valued part of our community!
-
-Best regards,
-The Team`
+      content: previewContent,
+      subject: previewSubject
     });
+    setShowPreview(true);
+  };
+
+  const handleResetPreview = () => {
+    // Restore original content with {{name}} placeholder
+    const originalContent = formData.content.replace(new RegExp(previewName, 'g'), '{{name}}');
+    const originalSubject = formData.subject?.replace(new RegExp(previewName, 'g'), '{{name}}');
+    
+    setFormData({
+      ...formData,
+      content: originalContent,
+      subject: originalSubject
+    });
+    setShowPreview(false);
   };
 
   const handleSave = async (e, sendNow = false) => {
@@ -376,10 +456,10 @@ The Team`
                         <Button
                           variant="text"
                           size="small"
-                          startIcon={<AIIcon />}
-                          onClick={handleGenerateAIContent}
+                          startIcon={loading ? <CircularProgress size={16} /> : <AIIcon />}
+                          onClick={() => setShowAiCustomization(true)}
                           sx={{ ml: 2 }}
-                          disabled={useAI}
+                          disabled={loading}
                         >
                           Generate with AI
                         </Button>
@@ -387,6 +467,52 @@ The Team`
                     }
                   />
                   
+                  {/* Preview Section */}
+                  {formData.content.includes('{{name}}') && (
+                    <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Preview Message
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        <TextField
+                          size="small"
+                          label="Enter name to preview"
+                          value={previewName}
+                          onChange={(e) => setPreviewName(e.target.value)}
+                          sx={{ width: 200 }}
+                        />
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={handlePreview}
+                          disabled={!previewName}
+                        >
+                          Preview
+                        </Button>
+                      </Box>
+                      
+                      {showPreview && (
+                        <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                          {formData.type === 'email' && (
+                            <Typography variant="subtitle1" gutterBottom>
+                              Subject: {formData.subject}
+                            </Typography>
+                          )}
+                          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                            {formData.content}
+                          </Typography>
+                          <Button
+                            size="small"
+                            onClick={handleResetPreview}
+                            sx={{ mt: 2 }}
+                          >
+                            Close Preview
+                          </Button>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
                   <Box sx={{ mt: 3 }}>
                     <FormControlLabel
                       control={
@@ -581,6 +707,73 @@ The Team`
           </form>
         )}
       </Container>
+
+      {/* AI Customization Dialog */}
+      <Dialog 
+        open={showAiCustomization} 
+        onClose={() => setShowAiCustomization(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Customize AI Generation</DialogTitle>
+        <DialogContent>
+          <FormGroup sx={{ gap: 2, mt: 2 }}>
+            <FormControl>
+              <InputLabel>Tone</InputLabel>
+              <Select
+                value={aiCustomization.tone}
+                onChange={(e) => setAiCustomization({ ...aiCustomization, tone: e.target.value })}
+                label="Tone"
+              >
+                <MenuItem value="professional">Professional</MenuItem>
+                <MenuItem value="friendly">Friendly</MenuItem>
+                <MenuItem value="casual">Casual</MenuItem>
+                <MenuItem value="formal">Formal</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Box>
+              <Typography gutterBottom>Message Length</Typography>
+              <Slider
+                value={aiCustomization.length}
+                onChange={(e, value) => setAiCustomization({ ...aiCustomization, length: value })}
+                valueLabelDisplay="auto"
+                min={0}
+                max={100}
+                marks
+              />
+            </Box>
+
+            <TextField
+              label="Keywords to Include"
+              value={aiCustomization.keywords}
+              onChange={(e) => setAiCustomization({ ...aiCustomization, keywords: e.target.value })}
+              helperText="Separate keywords with commas"
+            />
+
+            <TextField
+              label="Additional Instructions"
+              value={aiCustomization.customInstructions}
+              onChange={(e) => setAiCustomization({ ...aiCustomization, customInstructions: e.target.value })}
+              multiline
+              rows={3}
+            />
+          </FormGroup>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAiCustomization(false)}>Cancel</Button>
+          <Button 
+            onClick={() => {
+              setShowAiCustomization(false);
+              handleGenerateAIContent();
+            }}
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Generate'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

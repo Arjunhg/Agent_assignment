@@ -1,6 +1,7 @@
 const Message = require('../models/Message');
 const Contact = require('../models/Contact');
 const Referral = require('../models/Referral');
+const { sendEmail } = require('../services/emailService');
 
 // Create a new message (email or SMS)
 exports.createMessage = async (req, res, next) => {
@@ -115,9 +116,37 @@ exports.sendMessage = async (req, res, next) => {
       });
     }
 
-    // In a real-world scenario, here you would integrate with an email or SMS service
-    // For now, we'll just update the message status
+    // Send emails to all recipients
+    if (message.type === 'email') {
+      const sendPromises = message.recipients.map(async (recipient) => {
+        try {
+          // Replace {{name}} placeholder with actual name if available
+          let content = message.content;
+          let subject = message.subject;
+          
+          // Try to find the contact to get their name
+          const contact = await Contact.findOne({ email: recipient });
+          if (contact) {
+            content = content.replace(/{{name}}/g, contact.name);
+            subject = subject.replace(/{{name}}/g, contact.name);
+          }
 
+          await sendEmail(
+            recipient,
+            subject,
+            content
+          );
+        } catch (error) {
+          console.error(`Error sending email to ${recipient}:`, error);
+          // Continue with other recipients even if one fails
+        }
+      });
+
+      // Wait for all emails to be sent
+      await Promise.all(sendPromises);
+    }
+
+    // Update message status
     message.status = 'sent';
     message.sentAt = Date.now();
     await message.save();
