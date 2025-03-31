@@ -89,6 +89,46 @@ const CampaignList = () => {
     }
   };
 
+  const handleStatusChange = async (newStatus) => {
+    try {
+      await campaignService.updateCampaign(selectedCampaign._id, { status: newStatus });
+      setCampaigns(campaigns.map(c => 
+        c._id === selectedCampaign._id ? { ...c, status: newStatus } : c
+      ));
+      handleMenuClose();
+    } catch (err) {
+      console.error('Error updating campaign status:', err);
+      // Add error notification here
+    }
+  };
+
+  const getStatusActions = (campaign) => {
+    switch (campaign.status) {
+      case 'draft':
+        return [
+          { label: 'Activate', action: () => handleStatusChange('active') },
+          { label: 'Edit', action: handleEdit },
+          { label: 'Delete', action: handleDelete }
+        ];
+      case 'active':
+        return [
+          { label: 'Deactivate', action: () => handleStatusChange('inactive') },
+          { label: 'Edit', action: handleEdit }
+        ];
+      case 'inactive':
+        return [
+          { label: 'Activate', action: () => handleStatusChange('active') },
+          { label: 'Edit', action: handleEdit },
+          { label: 'Delete', action: handleDelete }
+        ];
+      default:
+        return [
+          { label: 'Edit', action: handleEdit },
+          { label: 'Delete', action: handleDelete }
+        ];
+    }
+  };
+
   const filteredCampaigns = campaigns.filter(campaign => 
     campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -144,7 +184,7 @@ const CampaignList = () => {
         </Box>
 
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
           </Box>
         ) : error ? (
@@ -205,41 +245,22 @@ const CampaignList = () => {
                       {campaign.description || 'No description provided'}
                     </Typography>
 
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary" component="div">
-                          Reward Value
-                        </Typography>
-                        <Typography variant="body2" fontWeight={500}>
-                          {campaign.rewardType === 'discount' 
-                            ? `${campaign.rewardValue}% Off` 
-                            : `$${campaign.rewardValue}`}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary" component="div">
-                          Referrals
-                        </Typography>
-                        <Typography variant="body2" fontWeight={500}>
-                          {campaign.referralCount}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-
-                    <Divider sx={{ my: 2 }} />
-
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Created: {new Date(campaign.createdAt).toLocaleDateString()}
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Reward: {campaign.rewardType === 'discount' 
+                          ? `${campaign.rewardValue}% Off` 
+                          : `$${campaign.rewardValue}`}
                       </Typography>
-                      <Button 
-                        variant="text" 
-                        size="small" 
-                        startIcon={<ShareIcon fontSize="small" />}
-                        onClick={() => navigate(`/referrals/new?campaignId=${campaign._id}`)}
-                      >
-                        Share
-                      </Button>
+                      {campaign.startDate && (
+                        <Typography variant="body2" color="text.secondary">
+                          Starts: {new Date(campaign.startDate).toLocaleDateString()}
+                        </Typography>
+                      )}
+                      {campaign.endDate && (
+                        <Typography variant="body2" color="text.secondary">
+                          Ends: {new Date(campaign.endDate).toLocaleDateString()}
+                        </Typography>
+                      )}
                     </Box>
                   </CardContent>
                 </Card>
@@ -247,38 +268,22 @@ const CampaignList = () => {
             ))}
           </Grid>
         )}
-      </Container>
 
-      {/* Campaign options menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        PaperProps={{
-          elevation: 3,
-          sx: { minWidth: 180 }
-        }}
-      >
-        <MenuItem onClick={handleView}>
-          <ListItemIcon>
-            <CampaignIcon fontSize="small" />
-          </ListItemIcon>
-          View Details
-        </MenuItem>
-        <MenuItem onClick={handleEdit}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          Edit
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" color="error" />
-          </ListItemIcon>
-          Delete
-        </MenuItem>
-      </Menu>
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={handleMenuClose}
+        >
+          {selectedCampaign && getStatusActions(selectedCampaign).map((action) => (
+            <MenuItem key={action.label} onClick={() => {
+              action.action();
+              handleMenuClose();
+            }}>
+              {action.label}
+            </MenuItem>
+          ))}
+        </Menu>
+      </Container>
     </>
   );
 };

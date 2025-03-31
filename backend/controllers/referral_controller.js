@@ -1,27 +1,20 @@
 const Referral = require('../models/Referral');
 const Campaign = require('../models/Campaign');
+const { v4: uuidv4 } = require('uuid');
 
-// Create a new referral link
+// Create a new referral
 exports.createReferral = async (req, res, next) => {
   try {
-    const { name, email, phone, campaignId } = req.body;
+    const { campaignId, referrer, referred } = req.body;
 
-    if (!name || !campaignId) {
+    if (!campaignId || !referrer || !referred) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide referrer name and campaign ID'
+        message: 'Please provide campaign ID, referrer, and referred details'
       });
     }
 
-    // Ensure either email or phone is provided
-    if (!email && !phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide either email or phone'
-      });
-    }
-
-    // Check if campaign exists
+    // Find the campaign
     const campaign = await Campaign.findById(campaignId);
     if (!campaign) {
       return res.status(404).json({
@@ -30,25 +23,39 @@ exports.createReferral = async (req, res, next) => {
       });
     }
 
-    // Generate a unique referral code
-    const referralCode = Math.random().toString(36).substring(2, 10);
-    
-    // Create the referral link
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const referralLink = `${cleanBaseUrl}/refer/${referralCode}`;
+    // Check if campaign is active
+    const now = new Date();
+    const isActive = campaign.status === 'active' &&
+      (!campaign.startDate || campaign.startDate <= now) &&
+      (!campaign.endDate || campaign.endDate >= now);
 
+    if (!isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'This campaign is not currently active'
+      });
+    }
+
+    // Generate unique referral code and link
+    const referralCode = uuidv4().substring(0, 8);
+    const referralLink = `${process.env.FRONTEND_URL}/refer?code=${referralCode}`;
+
+    // Create the referral
     const referral = await Referral.create({
       referralCode,
       referralLink,
-      referrer: {
-        name,
-        email,
-        phone
-      },
+      referrer,
+      referred: [{
+        ...referred,
+        status: 'pending'
+      }],
       campaign: campaignId,
       business: req.user.id
     });
+
+    // Update campaign referral count
+    campaign.referralCount += 1;
+    await campaign.save();
 
     res.status(201).json({
       success: true,

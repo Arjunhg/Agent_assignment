@@ -1,5 +1,15 @@
 const Campaign = require('../models/Campaign');
 
+// Helper function to check if campaign is active
+const isCampaignActive = (campaign) => {
+  const now = new Date();
+  return (
+    campaign.status === 'active' &&
+    (!campaign.startDate || campaign.startDate <= now) &&
+    (!campaign.endDate || campaign.endDate >= now)
+  );
+};
+
 // Create a new campaign
 exports.createCampaign = async (req, res, next) => {
   try {
@@ -41,6 +51,14 @@ exports.createCampaign = async (req, res, next) => {
       });
     }
 
+    // Validate dates
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date must be after start date'
+      });
+    }
+
     const campaign = await Campaign.create({
       name,
       description,
@@ -48,7 +66,7 @@ exports.createCampaign = async (req, res, next) => {
       rewardValue,
       discountCode,
       payoutMethod,
-      status,
+      status: status || 'draft',
       startDate,
       endDate,
       createdBy: req.user.id,
@@ -70,6 +88,15 @@ exports.createCampaign = async (req, res, next) => {
 exports.getCampaigns = async (req, res, next) => {
   try {
     const campaigns = await Campaign.find({ createdBy: req.user.id });
+    
+    // Update campaign statuses based on dates
+    for (const campaign of campaigns) {
+      const isActive = isCampaignActive(campaign);
+      if (campaign.status === 'active' && !isActive) {
+        campaign.status = 'inactive';
+        await campaign.save();
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -81,7 +108,7 @@ exports.getCampaigns = async (req, res, next) => {
   }
 };
 
-// Get a single campaign by ID
+// Get a single campaign
 exports.getCampaign = async (req, res, next) => {
   try {
     const campaign = await Campaign.findById(req.params.id);
@@ -93,12 +120,19 @@ exports.getCampaign = async (req, res, next) => {
       });
     }
 
-    // Check if the campaign belongs to the authenticated user
+    // Check if user owns the campaign
     if (campaign.createdBy.toString() !== req.user.id) {
       return res.status(401).json({
         success: false,
         message: 'Not authorized to access this campaign'
       });
+    }
+
+    // Update campaign status based on dates
+    const isActive = isCampaignActive(campaign);
+    if (campaign.status === 'active' && !isActive) {
+      campaign.status = 'inactive';
+      await campaign.save();
     }
 
     res.status(200).json({
@@ -113,7 +147,7 @@ exports.getCampaign = async (req, res, next) => {
 // Update a campaign
 exports.updateCampaign = async (req, res, next) => {
   try {
-    let campaign = await Campaign.findById(req.params.id);
+    const campaign = await Campaign.findById(req.params.id);
 
     if (!campaign) {
       return res.status(404).json({
@@ -122,7 +156,7 @@ exports.updateCampaign = async (req, res, next) => {
       });
     }
 
-    // Check if the campaign belongs to the authenticated user
+    // Check if user owns the campaign
     if (campaign.createdBy.toString() !== req.user.id) {
       return res.status(401).json({
         success: false,
@@ -130,17 +164,47 @@ exports.updateCampaign = async (req, res, next) => {
       });
     }
 
-    // Update the updatedAt field
-    req.body.updatedAt = Date.now();
+    // Validate dates if provided
+    if (req.body.startDate && req.body.endDate && req.body.startDate > req.body.endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date must be after start date'
+      });
+    }
 
-    campaign = await Campaign.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    // If changing to active status, validate required fields
+    if (req.body.status === 'active') {
+      if (!campaign.rewardType || !campaign.rewardValue) {
+        return res.status(400).json({
+          success: false,
+          message: 'Campaign must have reward type and value to be activated'
+        });
+      }
+
+      if (campaign.rewardType === 'discount' && !campaign.discountCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Discount campaigns must have a discount code to be activated'
+        });
+      }
+
+      if (campaign.rewardType === 'payout' && !campaign.payoutMethod) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payout campaigns must have a payout method to be activated'
+        });
+      }
+    }
+
+    const updatedCampaign = await Campaign.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
 
     res.status(200).json({
       success: true,
-      data: campaign
+      data: updatedCampaign
     });
   } catch (err) {
     next(err);
@@ -159,11 +223,19 @@ exports.deleteCampaign = async (req, res, next) => {
       });
     }
 
-    // Check if the campaign belongs to the authenticated user
+    // Check if user owns the campaign
     if (campaign.createdBy.toString() !== req.user.id) {
       return res.status(401).json({
         success: false,
         message: 'Not authorized to delete this campaign'
+      });
+    }
+
+    // Prevent deletion of active campaigns
+    if (campaign.status === 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete an active campaign. Please deactivate it first.'
       });
     }
 

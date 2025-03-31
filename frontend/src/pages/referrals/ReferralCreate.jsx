@@ -102,7 +102,22 @@ const ReferralCreate = () => {
       setLoading(true);
       setError('');
       
-      const response = await referralService.createReferral(formData);
+      // Format the data according to backend expectations
+      const referralData = {
+        campaignId: formData.campaignId,
+        referrer: {
+          name: formData.name,
+          email: formData.email || undefined,
+          phone: formData.phone || undefined
+        },
+        referred: {
+          name: formData.name,
+          email: formData.email || undefined,
+          phone: formData.phone || undefined
+        }
+      };
+      
+      const response = await referralService.createReferral(referralData);
       
       if (response.data.success) {
         setReferral(response.data.data);
