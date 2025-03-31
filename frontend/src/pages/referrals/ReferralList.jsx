@@ -28,6 +28,10 @@ import {
   Tab,
   Tabs,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -39,6 +43,7 @@ import {
   Cancel as CancelIcon,
   Home as HomeIcon,
   Visibility as VisibilityIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { referralService, campaignService } from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
@@ -74,6 +79,9 @@ const ReferralList = () => {
   const [campaignFilter, setCampaignFilter] = useState('all');
   const [tabValue, setTabValue] = useState(0);
   const [copySuccess, setCopySuccess] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedReferral, setSelectedReferral] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchReferrals();
@@ -115,6 +123,32 @@ const ReferralList = () => {
       .catch(err => {
         console.error('Failed to copy link:', err);
       });
+  };
+
+  const handleDeleteClick = (referral) => {
+    setSelectedReferral(referral);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedReferral) return;
+    
+    try {
+      setDeleting(true);
+      await referralService.deleteReferral(selectedReferral._id);
+      
+      // Update the referrals list
+      setReferrals(referrals.filter(r => r._id !== selectedReferral._id));
+      
+      // Close dialog and reset state
+      setDeleteDialogOpen(false);
+      setSelectedReferral(null);
+    } catch (err) {
+      console.error('Error deleting referral:', err);
+      setError('Failed to delete referral. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Filter referrals based on search query and campaign filter
@@ -302,21 +336,27 @@ const ReferralList = () => {
                           )}
                         </TableCell>
                         <TableCell align="right">
-                          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => handleCopyLink(referral.referralLink)}
-                              title="Copy referral link"
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => navigate(`/referrals/${referral._id}`)}
+                              color="primary"
                             >
-                              <ContentCopyIcon fontSize="small" />
+                              <VisibilityIcon />
                             </IconButton>
                             <IconButton
                               size="small"
-                              component={Link}
-                              to={`/referrals/${referral._id}`}
-                              title="View details"
+                              onClick={() => handleCopyLink(referral.referralLink)}
+                              color="primary"
                             >
-                              <VisibilityIcon fontSize="small" />
+                              <ContentCopyIcon />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteClick(referral)}
+                              color="error"
+                            >
+                              <DeleteIcon />
                             </IconButton>
                           </Box>
                         </TableCell>
@@ -426,6 +466,33 @@ const ReferralList = () => {
             {copySuccess}
           </Alert>
         )}
+
+        {/* Add Delete Dialog */}
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+        >
+          <DialogTitle>Delete Referral</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete this referral? This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              color="error"
+              variant="contained"
+              disabled={deleting}
+              startIcon={deleting ? <CircularProgress size={20} /> : <DeleteIcon />}
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </>
   );

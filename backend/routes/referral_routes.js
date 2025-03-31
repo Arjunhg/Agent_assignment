@@ -8,7 +8,8 @@ const {
   getReferral,
   trackReferralClick,
   addReferred,
-  updateReferredStatus
+  updateReferredStatus,
+  deleteReferral
 } = require('../controllers/referral_controller');
 
 // Routes
@@ -17,7 +18,8 @@ router.route('/')
   .get(protect, getReferrals);
 
 router.route('/:id')
-  .get(protect, getReferral);
+  .get(protect, getReferral)
+  .delete(protect, deleteReferral);
 
 router.route('/click/:referralCode')
   .post(trackReferralClick);

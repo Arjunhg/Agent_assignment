@@ -67,6 +67,7 @@ export const referralService = {
   createReferral: (referralData) => api.post('/api/referrals', referralData),
   getReferrals: () => api.get('/api/referrals'),
   getReferral: (id) => api.get(`/api/referrals/${id}`),
+  deleteReferral: (id) => api.delete(`/api/referrals/${id}`),
   trackReferralClick: (referralCode) => api.post(`/api/referrals/click/${referralCode}`),
   addReferred: (referralCode, referredData) => api.post(`/api/referrals/refer/${referralCode}`, referredData),
   updateReferredStatus: (statusData) => api.put('/api/referrals/status', statusData),

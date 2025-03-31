@@ -1,6 +1,7 @@
 const Referral = require('../models/Referral');
 const Campaign = require('../models/Campaign');
 const { v4: uuidv4 } = require('uuid');
+const { sendEmail } = require('../services/emailService');
 
 // Create a new referral
 exports.createReferral = async (req, res, next) => {
@@ -38,7 +39,8 @@ exports.createReferral = async (req, res, next) => {
 
     // Generate unique referral code and link
     const referralCode = uuidv4().substring(0, 8);
-    const referralLink = `${process.env.FRONTEND_URL}/refer?code=${referralCode}`;
+    const baseUrl = process.env.FRONTEND_URL.replace(/\/$/, ''); // Remove trailing slash if present
+    const referralLink = `${baseUrl}/refer/${referralCode}`;
 
     // Create the referral
     const referral = await Referral.create({
@@ -109,7 +111,8 @@ exports.addReferred = async (req, res, next) => {
       });
     }
 
-    const referral = await Referral.findOne({ referralCode });
+    const referral = await Referral.findOne({ referralCode })
+      .populate('campaign', 'name rewardType rewardValue');
 
     if (!referral) {
       return res.status(404).json({
@@ -138,6 +141,15 @@ exports.addReferred = async (req, res, next) => {
       referral.campaign,
       { $inc: { referralCount: 1 } }
     );
+
+    // Send welcome email if email is provided
+    if (email) {
+      await sendEmail(
+        email,
+        'welcome',
+        [name, referral.campaign.name]
+      );
+    }
 
     res.status(200).json({
       success: true,
@@ -215,7 +227,8 @@ exports.updateReferredStatus = async (req, res, next) => {
       });
     }
 
-    const referral = await Referral.findById(referralId);
+    const referral = await Referral.findById(referralId)
+      .populate('campaign', 'name rewardType rewardValue');
 
     if (!referral) {
       return res.status(404).json({
@@ -250,9 +263,70 @@ exports.updateReferredStatus = async (req, res, next) => {
     referral.updatedAt = Date.now();
     await referral.save();
 
+    // Send status update email if email is provided
+    if (referredPerson.email) {
+      if (status === 'contacted') {
+        await sendEmail(
+          referredPerson.email,
+          'contacted',
+          [referredPerson.name, referral.campaign.name]
+        );
+      } else if (status === 'converted') {
+        await sendEmail(
+          referredPerson.email,
+          'converted',
+          [referredPerson.name, referral.campaign.name, referral.campaign.rewardType, referral.campaign.rewardValue]
+        );
+      } else if (status === 'rejected') {
+        await sendEmail(
+          referredPerson.email,
+          'rejected',
+          [referredPerson.name, referral.campaign.name]
+        );
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: referral
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Delete a referral
+exports.deleteReferral = async (req, res, next) => {
+  try {
+    const referral = await Referral.findById(req.params.id);
+
+    if (!referral) {
+      return res.status(404).json({
+        success: false,
+        message: 'Referral not found'
+      });
+    }
+
+    // Check if user owns this referral
+    if (referral.business.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this referral'
+      });
+    }
+
+    // Update campaign referral count
+    await Campaign.findByIdAndUpdate(
+      referral.campaign,
+      { $inc: { referralCount: -1 } }
+    );
+
+    // Delete the referral
+    await referral.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: 'Referral deleted successfully'
     });
   } catch (err) {
     next(err);
