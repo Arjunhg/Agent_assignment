@@ -21,11 +21,16 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    DialogContentText
+    DialogContentText,
+    TextField,
+    MenuItem
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
-import { agentService } from '../services/api';
+import { agentService, contactService } from '../services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import { format } from 'date-fns';
+import LinearProgress from '@mui/material/LinearProgress';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -90,32 +95,76 @@ const AgentDetails = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [taskStats, setTaskStats] = useState(null);
+    const [statusForm, setStatusForm] = useState({
+        status: '',
+        completionNotes: '',
+        followUpStatus: 'none',
+        followUpDate: null,
+        followUpNotes: ''
+    });
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchAgentDetails = async () => {
-            try {
-                const token = localStorage.getItem("token");
-                const response = await axios.get(`${BACKEND_URL}/api/agents/${id}`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+    const fetchAgentDetails = async () => {
+        try {
+            const token = localStorage.getItem("token");
+            const response = await axios.get(`${BACKEND_URL}/api/agents/${id}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
 
-                if (response.data.success) {
-                    setAgent(response.data.data);
-                } else {
-                    setError("Failed to fetch agent details.");
-                }
-            } catch (err) {
-                setError(err.response?.data?.message || "Error fetching agent details.");
-            } finally {
-                setLoading(false);
+            if (response.data.success) {
+                setAgent(response.data.data);
+            } else {
+                setError("Failed to fetch agent details.");
             }
-        };
+        } catch (err) {
+            setError(err.response?.data?.message || "Error fetching agent details.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchAgentDetails();
     }, [id]);
+
+    useEffect(() => {
+        fetchTaskStats();
+    }, []);
+
+    const fetchTaskStats = async () => {
+        try {
+            // Get all tasks for the current agent
+            const agentTasks = agent.tasks;
+            
+            // Calculate statistics for the current agent's tasks
+            const stats = [
+                { _id: 'pending', count: agentTasks.filter(task => !task.status || task.status === 'pending').length },
+                { _id: 'in_progress', count: agentTasks.filter(task => task.status === 'in_progress').length },
+                { _id: 'completed', count: agentTasks.filter(task => task.status === 'completed').length },
+                { _id: 'failed', count: agentTasks.filter(task => task.status === 'failed').length }
+            ];
+
+            const totalTasks = agentTasks.length;
+            
+            setTaskStats({
+                stats,
+                totalTasks
+            });
+        } catch (error) {
+            console.error('Error calculating task stats:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (agent) {
+            fetchTaskStats();
+        }
+    }, [agent]);
 
     const handleDeleteClick = () => {
         setDeleteDialogOpen(true);
@@ -133,6 +182,55 @@ const AgentDetails = () => {
 
     const handleDeleteCancel = () => {
         setDeleteDialogOpen(false);
+    };
+
+    const handleStatusClick = (task) => {
+        setSelectedTask(task);
+        setStatusForm({
+            status: task.status || 'pending',
+            completionNotes: task.completionNotes || '',
+            followUpStatus: task.followUpStatus || 'none',
+            followUpDate: task.followUpDate ? new Date(task.followUpDate) : null,
+            followUpNotes: task.followUpNotes || ''
+        });
+        setStatusDialogOpen(true);
+    };
+
+    const handleStatusUpdate = async () => {
+        try {
+            await contactService.updateTaskStatus(selectedTask._id, statusForm);
+            fetchAgentDetails();
+            fetchTaskStats();
+            setStatusDialogOpen(false);
+        } catch (error) {
+            console.error('Error updating task status:', error);
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'completed':
+                return 'success';
+            case 'in_progress':
+                return 'primary';
+            case 'failed':
+                return 'error';
+            default:
+                return 'default';
+        }
+    };
+
+    const getStatusLabel = (status) => {
+        switch (status) {
+            case 'completed':
+                return 'Completed';
+            case 'in_progress':
+                return 'In Progress';
+            case 'failed':
+                return 'Failed';
+            default:
+                return 'Pending';
+        }
     };
 
     if (loading) {
@@ -291,6 +389,34 @@ const AgentDetails = () => {
                     </Box>
                 </Paper>
 
+                {/* Add Task Stats Section */}
+                {taskStats && (
+                    <Paper sx={{ p: 3, mb: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Task Statistics
+                        </Typography>
+                        <Grid container spacing={2}>
+                            {taskStats.stats.map((stat) => (
+                                <Grid item xs={12} sm={6} md={3} key={stat._id}>
+                                    <Box sx={{ textAlign: 'center' }}>
+                                        <Typography variant="h4" color="primary">
+                                            {stat.count}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {getStatusLabel(stat._id)}
+                                        </Typography>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={(stat.count / taskStats.totalTasks) * 100}
+                                            sx={{ mt: 1 }}
+                                        />
+                                    </Box>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    </Paper>
+                )}
+
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <Typography
                         variant="h5"
@@ -330,6 +456,22 @@ const AgentDetails = () => {
                                                     {task.phone}
                                                 </Typography>
                                             </Grid>
+                                            <Grid item xs={12}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                                    <Chip
+                                                        label={getStatusLabel(task.status)}
+                                                        color={getStatusColor(task.status)}
+                                                        size="small"
+                                                    />
+                                                    <Button
+                                                        size="small"
+                                                        onClick={() => handleStatusClick(task)}
+                                                        startIcon={<EditIcon />}
+                                                    >
+                                                        Update Status
+                                                    </Button>
+                                                </Box>
+                                            </Grid>
                                         </Grid>
 
                                         <Divider sx={{ my: 2 }} />
@@ -351,14 +493,29 @@ const AgentDetails = () => {
                                             </Typography>
                                         </Paper>
 
+                                        {task.completionNotes && (
+                                            <>
+                                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                    Completion Notes
+                                                </Typography>
+                                                <Paper
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 2,
+                                                        backgroundColor: 'rgba(76, 175, 80, 0.03)',
+                                                        border: '1px solid rgba(76, 175, 80, 0.1)',
+                                                        mb: 2
+                                                    }}
+                                                >
+                                                    <Typography variant="body2">
+                                                        {task.completionNotes}
+                                                    </Typography>
+                                                </Paper>
+                                            </>
+                                        )}
+
                                         <Typography variant="body2" color="text.secondary">
-                                            Assigned on {new Date(task.createdAt).toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
+                                            Assigned on {format(new Date(task.createdAt), 'MMMM d, yyyy')}
                                         </Typography>
                                     </CardContent>
                                 </Card>
@@ -402,6 +559,97 @@ const AgentDetails = () => {
                         </Button>
                         <Button onClick={handleDeleteConfirm} color="error" variant="contained">
                             Delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Status Update Dialog */}
+                <Dialog
+                    open={statusDialogOpen}
+                    onClose={() => setStatusDialogOpen(false)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle>Update Task Status</DialogTitle>
+                    <DialogContent>
+                        <Box sx={{ pt: 2 }}>
+                            <TextField
+                                select
+                                fullWidth
+                                label="Status"
+                                value={statusForm.status}
+                                onChange={(e) => setStatusForm({ ...statusForm, status: e.target.value })}
+                                sx={{ mb: 2 }}
+                            >
+                                <MenuItem value="pending">Pending</MenuItem>
+                                <MenuItem value="in_progress">In Progress</MenuItem>
+                                <MenuItem value="completed">Completed</MenuItem>
+                                <MenuItem value="failed">Failed</MenuItem>
+                            </TextField>
+
+                            {statusForm.status === 'completed' && (
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    label="Completion Notes (Required)"
+                                    placeholder="Describe what was done to complete this task..."
+                                    value={statusForm.completionNotes}
+                                    onChange={(e) => setStatusForm({ ...statusForm, completionNotes: e.target.value })}
+                                    sx={{ mb: 2 }}
+                                    required
+                                />
+                            )}
+
+                            <Divider sx={{ my: 2 }} />
+
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                Follow-up Information (Optional)
+                            </Typography>
+
+                            <TextField
+                                select
+                                fullWidth
+                                label="Follow-up Status"
+                                value={statusForm.followUpStatus}
+                                onChange={(e) => setStatusForm({ ...statusForm, followUpStatus: e.target.value })}
+                                sx={{ mb: 2 }}
+                            >
+                                <MenuItem value="none">No Follow-up Required</MenuItem>
+                                <MenuItem value="scheduled">Schedule Follow-up</MenuItem>
+                                <MenuItem value="completed">Follow-up Completed</MenuItem>
+                                <MenuItem value="cancelled">Follow-up Cancelled</MenuItem>
+                            </TextField>
+
+                            {statusForm.followUpStatus === 'scheduled' && (
+                                <TextField
+                                    fullWidth
+                                    type="datetime-local"
+                                    label="Follow-up Date"
+                                    value={statusForm.followUpDate ? format(statusForm.followUpDate, "yyyy-MM-dd'T'HH:mm") : ''}
+                                    onChange={(e) => setStatusForm({ ...statusForm, followUpDate: new Date(e.target.value) })}
+                                    sx={{ mb: 2 }}
+                                    InputLabelProps={{ shrink: true }}
+                                />
+                            )}
+
+                            {(statusForm.followUpStatus === 'scheduled' || statusForm.followUpStatus === 'completed') && (
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    label="Follow-up Notes"
+                                    placeholder="Describe what needs to be done in the follow-up..."
+                                    value={statusForm.followUpNotes}
+                                    onChange={(e) => setStatusForm({ ...statusForm, followUpNotes: e.target.value })}
+                                />
+                            )}
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setStatusDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleStatusUpdate} variant="contained" color="primary">
+                            Update Status
                         </Button>
                     </DialogActions>
                 </Dialog>

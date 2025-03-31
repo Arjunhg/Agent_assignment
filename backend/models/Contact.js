@@ -15,6 +15,30 @@ const ContactSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  status: {
+    type: String,
+    enum: ['pending', 'in_progress', 'completed', 'failed'],
+    default: 'pending'
+  },
+  completionNotes: {
+    type: String,
+    trim: true
+  },
+  completionDate: {
+    type: Date
+  },
+  followUpStatus: {
+    type: String,
+    enum: ['none', 'scheduled', 'completed', 'cancelled'],
+    default: 'none'
+  },
+  followUpDate: {
+    type: Date
+  },
+  followUpNotes: {
+    type: String,
+    trim: true
+  },
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Agent',

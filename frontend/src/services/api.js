@@ -44,6 +44,8 @@ export const contactService = {
   getContactsByAgent: (agentId) => api.get(`/api/contacts/agent/${agentId}`),
   updateContact: (id, contactData) => api.put(`/api/contacts/${id}`, contactData),
   deleteContact: (id) => api.delete(`/api/contacts/${id}`),
+  updateTaskStatus: (id, statusData) => api.put(`/api/contacts/${id}/status`, statusData),
+  getTaskStats: () => api.get('/api/contacts/stats')
 };
 
 // Upload services
