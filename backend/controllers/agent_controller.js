@@ -1,5 +1,6 @@
 const Agent = require('../models/Agent');
 const User = require("../models/User")
+const Contact = require('../models/Contact');
 
 exports.createAgent = async (req, res, next) => {
   try {
@@ -152,13 +153,28 @@ exports.deleteAgent = async (req, res, next) => {
       });
     }
 
+    // Remove agent from user's agents list
+    await User.findByIdAndUpdate(
+      agent.createdBy,
+      { $pull: { agents: agent._id } }
+    );
+
+    // Update all contacts assigned to this agent to remove the assignment
+    await Contact.updateMany(
+      { assignedTo: agent._id },
+      { $unset: { assignedTo: 1 } }
+    );
+
+    // Delete the agent
     await agent.deleteOne();
 
     res.status(200).json({
       success: true,
+      message: 'Agent deleted successfully',
       data: {}
     });
   } catch (err) {
+    console.error('Error deleting agent:', err);
     next(err);
   }
 };

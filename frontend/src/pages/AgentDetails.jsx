@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
     Typography,
@@ -16,9 +15,17 @@ import {
     CardContent,
     ThemeProvider,
     createTheme,
-    Avatar
+    Avatar,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    DialogContentText
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
+import { agentService } from '../services/api';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -82,6 +89,8 @@ const AgentDetails = () => {
     const [agent, setAgent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchAgentDetails = async () => {
@@ -107,6 +116,24 @@ const AgentDetails = () => {
 
         fetchAgentDetails();
     }, [id]);
+
+    const handleDeleteClick = () => {
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        try {
+            await agentService.deleteAgent(agent._id);
+            navigate('/dashboard');
+        } catch (error) {
+            console.error('Error deleting agent:', error);
+            // You might want to show an error message to the user here
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+    };
 
     if (loading) {
         return (
@@ -145,15 +172,24 @@ const AgentDetails = () => {
     return (
         <ThemeProvider theme={theme}>
             <Container maxWidth="md" sx={{ py: 4 }}>
-                <Typography
-                    variant="h4"
-                    component="h2"
-                    color="primary"
-                    fontWeight="bold"
-                    gutterBottom
-                >
-                    Agent Details
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Typography
+                        variant="h5"
+                        component="h3"
+                        color="primary"
+                        fontWeight="bold"
+                    >
+                        Agent Details
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleDeleteClick}
+                        startIcon={<DeleteIcon />}
+                    >
+                        Delete Agent
+                    </Button>
+                </Box>
 
                 {/* Improved Agent Details Card */}
                 <Paper
@@ -344,6 +380,31 @@ const AgentDetails = () => {
                         </Typography>
                     </Paper>
                 )}
+
+                <Dialog
+                    open={deleteDialogOpen}
+                    onClose={handleDeleteCancel}
+                    aria-labelledby="delete-dialog-title"
+                    aria-describedby="delete-dialog-description"
+                >
+                    <DialogTitle id="delete-dialog-title">
+                        Delete Agent
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText id="delete-dialog-description">
+                            Are you sure you want to delete this agent? This action cannot be undone.
+                            All contacts assigned to this agent will be unassigned.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleDeleteCancel} color="primary">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+                            Delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </ThemeProvider>
     );

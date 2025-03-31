@@ -6,7 +6,6 @@ const Upload = require('../models/Upload');
 const Contact = require('../models/Contact');
 const Agent = require('../models/Agent');
 
-
 exports.uploadCSV = async (req, res, next) => {
   try {
     const { contacts, fileName } = req.body;
@@ -16,6 +15,15 @@ exports.uploadCSV = async (req, res, next) => {
         success: false,
         message: 'No valid contacts provided'
       });
+    }
+
+    // Remove duplicates based on phone number
+    const uniqueContacts = contacts.filter((contact, index, self) =>
+      index === self.findIndex((c) => c.phone === contact.phone)
+    );
+
+    if (uniqueContacts.length !== contacts.length) {
+      console.log(`Removed ${contacts.length - uniqueContacts.length} duplicate contacts`);
     }
 
     const batchId = uuidv4();
@@ -28,8 +36,8 @@ exports.uploadCSV = async (req, res, next) => {
       });
     }
 
-    const baseCount = Math.floor(contacts.length / agents.length);
-    const remainder = contacts.length % agents.length;
+    const baseCount = Math.floor(uniqueContacts.length / agents.length);
+    const remainder = uniqueContacts.length % agents.length;
 
     let distributedContacts = [];
     let currentIndex = 0;
@@ -38,7 +46,7 @@ exports.uploadCSV = async (req, res, next) => {
 
     const distribution = agents.map((agent, index) => {
       const count = index < remainder ? baseCount + 1 : baseCount;
-      const agentContacts = contacts.slice(currentIndex, currentIndex + count);
+      const agentContacts = uniqueContacts.slice(currentIndex, currentIndex + count);
       currentIndex += count;
 
       const contactObjects = agentContacts.map(contact => ({
@@ -51,7 +59,6 @@ exports.uploadCSV = async (req, res, next) => {
       }));
 
       distributedContacts = [...distributedContacts, ...contactObjects];
-
       agentTasksMap.set(agent._id.toString(), []);
 
       return {
@@ -60,30 +67,33 @@ exports.uploadCSV = async (req, res, next) => {
       };
     });
 
-
+    // Save contacts and get their IDs
     const savedContacts = await Contact.insertMany(distributedContacts);
 
-
+    // Map contacts to their assigned agents
     savedContacts.forEach(contact => {
       if (agentTasksMap.has(contact.assignedTo.toString())) {
         agentTasksMap.get(contact.assignedTo.toString()).push(contact._id);
       }
     });
 
-
+    // Update agents with their assigned contacts
     const updatePromises = [];
     for (let [agentId, contactIds] of agentTasksMap) {
       updatePromises.push(
-        Agent.findByIdAndUpdate(agentId, { $push: { tasks: { $each: contactIds } } })
+        Agent.findByIdAndUpdate(
+          agentId, 
+          { $set: { tasks: contactIds } }, // Use $set instead of $push to prevent duplicates
+          { new: true }
+        )
       );
     }
     await Promise.all(updatePromises);
 
-
     res.status(201).json({
       success: true,
       data: {
-        totalRecords: contacts.length,
+        totalRecords: uniqueContacts.length,
         distribution: distribution.map((dist, index) => ({
           agent: {
             id: agents[index]._id,
