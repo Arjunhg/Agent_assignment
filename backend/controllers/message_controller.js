@@ -133,6 +133,8 @@ exports.sendMessage = async (req, res, next) => {
 
           await sendEmail(
             recipient,
+            null,  // No template
+            null,  // No template data
             subject,
             content
           );

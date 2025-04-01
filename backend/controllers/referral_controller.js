@@ -144,11 +144,17 @@ exports.addReferred = async (req, res, next) => {
 
     // Send welcome email if email is provided
     if (email) {
-      await sendEmail(
-        email,
-        'welcome',
-        [name, referral.campaign.name]
-      );
+      try {
+        await sendEmail(
+          email,
+          'welcome', 
+          [name, referral.campaign.name]  // Pass as array explicitly
+        );
+        console.log(`Welcome email sent to ${email}`);
+      } catch (emailError) {
+        console.error('Error sending welcome email:', emailError);
+        // Don't fail the request if email fails
+      }
     }
 
     res.status(200).json({
@@ -265,24 +271,30 @@ exports.updateReferredStatus = async (req, res, next) => {
 
     // Send status update email if email is provided
     if (referredPerson.email) {
-      if (status === 'contacted') {
-        await sendEmail(
-          referredPerson.email,
-          'contacted',
-          [referredPerson.name, referral.campaign.name]
-        );
-      } else if (status === 'converted') {
-        await sendEmail(
-          referredPerson.email,
-          'converted',
-          [referredPerson.name, referral.campaign.name, referral.campaign.rewardType, referral.campaign.rewardValue]
-        );
-      } else if (status === 'rejected') {
-        await sendEmail(
-          referredPerson.email,
-          'rejected',
-          [referredPerson.name, referral.campaign.name]
-        );
+      try {
+        if (status === 'contacted') {
+          await sendEmail(
+            referredPerson.email,
+            'contacted',
+            [referredPerson.name, referral.campaign.name]
+          );
+        } else if (status === 'converted') {
+          await sendEmail(
+            referredPerson.email,
+            'converted',
+            [referredPerson.name, referral.campaign.name, referral.campaign.rewardType, referral.campaign.rewardValue]
+          );
+        } else if (status === 'rejected') {
+          await sendEmail(
+            referredPerson.email,
+            'rejected',
+            [referredPerson.name, referral.campaign.name]
+          );
+        }
+        console.log(`Status update email (${status}) sent to ${referredPerson.email}`);
+      } catch (emailError) {
+        console.error(`Error sending ${status} email:`, emailError);
+        // Don't fail the request if email fails
       }
     }
 

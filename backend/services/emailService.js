@@ -54,14 +54,22 @@ const templates = {
 };
 
 // Send email function
-const sendEmail = async (to, subject, content, template = null, data = []) => {
+const sendEmail = async (to, template = null, data = null, subject = null, content = null) => {
   try {
-    // If template and data are provided, use the template system
-    // Otherwise, use the provided subject and content
-    const emailData = template && data ? templates[template](...data) : {
-      subject,
-      html: content
-    };
+    // If template is provided, use the template system
+    let emailData;
+    
+    if (template && templates[template]) {
+      // Ensure data is properly formatted for the template
+      const templateParams = Array.isArray(data) ? data : [data];
+      emailData = templates[template](...templateParams);
+    } else {
+      // Otherwise, use the provided subject and content
+      emailData = {
+        subject: subject || "No Subject",
+        html: content || "No Content"
+      };
+    }
     
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
@@ -80,4 +88,4 @@ const sendEmail = async (to, subject, content, template = null, data = []) => {
 module.exports = {
   sendEmail,
   templates
-}; 
+};
