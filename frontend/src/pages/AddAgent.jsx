@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom"; // Add this import
 import axios from "axios";
 import {
     Container,
@@ -14,7 +15,8 @@ import {
     Box,
     Alert,
     createTheme,
-    ThemeProvider
+    ThemeProvider,
+    Stack // Add this import
 } from "@mui/material";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
@@ -103,6 +105,7 @@ const countryCodes = [
 ];
 
 const AddAgent = () => {
+    const navigate = useNavigate(); // Add navigation hook
     const [agent, setAgent] = useState({
         name: "",
         email: "",
@@ -113,6 +116,7 @@ const AddAgent = () => {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState("error");
+    const [createdAgentId, setCreatedAgentId] = useState(null); // Add state for tracking created agent ID
 
     const handleChange = (e) => {
         setAgent({ ...agent, [e.target.name]: e.target.value });
@@ -141,6 +145,7 @@ const AddAgent = () => {
             if (response.data.success) {
                 setMessage("Agent added successfully!");
                 setMessageType("success");
+                setCreatedAgentId(response.data.data.id); // Store the created agent ID
                 setAgent({ name: "", email: "", countryCode: "+1", mobile: "", password: "" });
             } else {
                 setMessage(response.data.message || "Failed to add agent.");
@@ -151,6 +156,13 @@ const AddAgent = () => {
             setMessageType("error");
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Add function to view agent details
+    const handleViewAgent = () => {
+        if (createdAgentId) {
+            navigate(`/agent/${createdAgentId}`);
         }
     };
 
@@ -194,6 +206,19 @@ const AddAgent = () => {
                             >
                                 {message}
                             </Alert>
+                        )}
+
+                        {/* Add View Agent button when an agent has been successfully created */}
+                        {createdAgentId && (
+                            <Box sx={{ mb: 3, textAlign: 'center' }}>
+                                <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    onClick={handleViewAgent}
+                                >
+                                    View Agent Details
+                                </Button>
+                            </Box>
                         )}
 
                         <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>

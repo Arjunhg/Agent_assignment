@@ -138,6 +138,10 @@ const AgentDetails = () => {
 
     const fetchTaskStats = async () => {
         try {
+            if (!agent || !agent.tasks) {
+                return;
+            }
+            
             // Get all tasks for the current agent
             const agentTasks = agent.tasks;
             

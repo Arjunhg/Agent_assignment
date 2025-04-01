@@ -4,31 +4,28 @@ const bcrypt = require('bcryptjs');
 const AgentSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Name is required'],
+    required: [true, 'Please add a name'],
     trim: true
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: [true, 'Please add an email'],
     unique: true,
-    trim: true,
-    lowercase: true,
-    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
+    match: [
+      /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+      'Please add a valid email'
+    ]
   },
   mobile: {
     type: String,
-    required: [true, 'Mobile number is required'],
-    unique: true,
-    trim: true
+    required: [true, 'Please add a mobile number'],
+    unique: true
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+    required: [true, 'Please add a password'],
+    minlength: 6,
+    select: false
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -38,17 +35,26 @@ const AgentSchema = new mongoose.Schema({
   tasks: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Contact'
-  }]
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
+// Encrypt password using bcrypt
 AgentSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
-    return next();
+    next();
   }
-  
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
+
+// Match user entered password to hashed password in database
+AgentSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 module.exports = mongoose.model('Agent', AgentSchema);

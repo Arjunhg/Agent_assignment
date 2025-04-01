@@ -1,11 +1,10 @@
 const Agent = require('../models/Agent');
-const User = require("../models/User")
-const Contact = require('../models/Contact');
+const User = require("../models/User");
+const Contact = require("../models/Contact");
 
 exports.createAgent = async (req, res, next) => {
   try {
     const { name, email, mobile, password } = req.body;
-
 
     if (!req.user || !req.user._id) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -19,7 +18,6 @@ exports.createAgent = async (req, res, next) => {
       });
     }
 
- 
     const existingAgent = await Agent.findOne({ email });
     if (existingAgent) {
       return res.status(400).json({
@@ -44,7 +42,6 @@ exports.createAgent = async (req, res, next) => {
       createdBy: req.user._id 
     });
 
-   
     await User.findByIdAndUpdate(
       req.user._id,
       { $push: { agents: agent._id } }, 
@@ -58,7 +55,8 @@ exports.createAgent = async (req, res, next) => {
         name: agent.name,
         email: agent.email,
         mobile: agent.mobile,
-        createdBy: agent.createdBy 
+        createdBy: agent.createdBy,
+        createdAt: agent.createdAt
       }
     });
   } catch (err) {
@@ -68,8 +66,10 @@ exports.createAgent = async (req, res, next) => {
 
 exports.getAgents = async (req, res, next) => {
   try {
+    console.log(`Fetching agents for user: ${req.user.id}`);
     const agents = await Agent.find({ createdBy: req.user.id }).select('-password');
 
+    console.log(`Found ${agents.length} agents for user ${req.user.id}`);
 
     if (!agents || agents.length === 0) {
       return res.status(404).json({
@@ -88,7 +88,6 @@ exports.getAgents = async (req, res, next) => {
     next(err);
   }
 };
-
 
 exports.updateAgent = async (req, res, next) => {
   try {
@@ -118,29 +117,57 @@ exports.updateAgent = async (req, res, next) => {
   }
 };
 
-
 exports.getAgentById = async (req, res, next) => {
   try {
-    const agent = await Agent.findById(req.params.id)
-      .select('-password')
-      .populate('tasks'); 
+    console.log(`Fetching agent with ID: ${req.params.id}`);
+    
+    // First get the agent without population to check tasks array
+    const agentCheck = await Agent.findById(req.params.id);
+    console.log('Initial agent check:', {
+      agentId: agentCheck?._id,
+      taskCount: agentCheck?.tasks?.length || 0,
+      taskIds: agentCheck?.tasks || []
+    });
 
-    if (!agent) {
+    if (!agentCheck) {
       return res.status(404).json({
         success: false,
         message: 'Agent not found'
       });
     }
 
-    res.status(200).json({
-      success: true,
-      data: agent
-    });
+    // If there are tasks, populate them
+    if (agentCheck.tasks && agentCheck.tasks.length > 0) {
+      const populatedAgent = await Agent.findById(req.params.id)
+        .select('-password')
+        .populate({
+          path: 'tasks',
+          model: 'Contact',
+          select: 'firstName phone notes status completionNotes followUpStatus followUpDate followUpNotes createdAt'
+        });
+
+      console.log('Populated agent:', {
+        agentId: populatedAgent._id,
+        taskCount: populatedAgent.tasks?.length || 0,
+        sampleTask: populatedAgent.tasks?.[0]
+      });
+
+      res.status(200).json({
+        success: true,
+        data: populatedAgent
+      });
+    } else {
+      // If no tasks, return agent without population
+      res.status(200).json({
+        success: true,
+        data: agentCheck
+      });
+    }
   } catch (err) {
+    console.error('Error fetching agent by ID:', err);
     next(err);
   }
 };
-
 
 exports.deleteAgent = async (req, res, next) => {
   try {
@@ -153,28 +180,13 @@ exports.deleteAgent = async (req, res, next) => {
       });
     }
 
-    // Remove agent from user's agents list
-    await User.findByIdAndUpdate(
-      agent.createdBy,
-      { $pull: { agents: agent._id } }
-    );
-
-    // Update all contacts assigned to this agent to remove the assignment
-    await Contact.updateMany(
-      { assignedTo: agent._id },
-      { $unset: { assignedTo: 1 } }
-    );
-
-    // Delete the agent
     await agent.deleteOne();
 
     res.status(200).json({
       success: true,
-      message: 'Agent deleted successfully',
       data: {}
     });
   } catch (err) {
-    console.error('Error deleting agent:', err);
     next(err);
   }
 };

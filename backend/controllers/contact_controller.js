@@ -1,9 +1,10 @@
 const Contact = require('../models/Contact');
-
+const Agent = require('../models/Agent');
 
 exports.getContacts = async (req, res, next) => {
   try {
-    const contacts = await Contact.find()
+    // Only get contacts uploaded by the current user
+    const contacts = await Contact.find({ uploadedBy: req.user.id })
       .populate({
         path: 'assignedTo',
         select: 'name email'
@@ -81,6 +82,19 @@ exports.updateTaskStatus = async (req, res, next) => {
 
 exports.getContactsByAgent = async (req, res, next) => {
   try {
+    // First verify the agent belongs to this user
+    const agent = await Agent.findOne({ 
+      _id: req.params.agentId,
+      createdBy: req.user.id
+    });
+    
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found or not authorized'
+      });
+    }
+    
     const contacts = await Contact.find({ assignedTo: req.params.agentId })
       .sort({ createdAt: -1 });
     
@@ -135,6 +149,30 @@ exports.deleteContact = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {}
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.debugAgentContacts = async (req, res, next) => {
+  try {
+    const { agentId } = req.params;
+    
+    // Find contacts assigned to this agent
+    const contacts = await Contact.find({ assignedTo: agentId });
+    
+    // Find the agent to check its tasks field
+    const agent = await Agent.findById(agentId).select('tasks');
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        contactsCount: contacts.length,
+        contacts: contacts.map(c => ({ id: c._id, name: c.firstName })),
+        agentTasksCount: agent?.tasks?.length || 0,
+        agentTasks: agent?.tasks || []
+      }
     });
   } catch (err) {
     next(err);

@@ -116,16 +116,28 @@ const UploadFile = () => {
         setMessage("");
 
         try {
+            console.log('Starting upload with contacts:', {
+                fileName: file.name,
+                contactCount: contacts.length,
+                sampleContact: contacts[0]
+            });
+
             const response = await uploadService.uploadCSV({ contacts, fileName: file.name })
+            console.log('Upload response:', response.data);
+
             if (response.data.success) {
                 setMessage("File uploaded successfully!");
                 setMessageType("success");
+                // Clear the form after successful upload
+                setFile(null);
+                setContacts([]);
             } else {
                 setMessage("Upload failed. " + response.data.message);
                 setMessageType("error");
             }
         } catch (error) {
-            setMessage("Error uploading file.");
+            console.error('Upload error:', error);
+            setMessage("Error uploading file: " + (error.response?.data?.message || error.message));
             setMessageType("error");
         } finally {
             setLoading(false);
