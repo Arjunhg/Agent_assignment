@@ -32,12 +32,14 @@ import {
   ArrowBack as ArrowBackIcon,
   ArrowForward as ArrowForwardIcon,
   Save as SaveIcon,
+  AutoFixHigh as AIIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { campaignService } from '../../services/api';
 import PageHeader from '../../components/common/PageHeader';
+import AICampaignGenerator from '../../components/campaign/AICampaignGenerator';
 
 const steps = ['Campaign Details', 'Reward Settings', 'Follow-up Options'];
 
@@ -46,6 +48,7 @@ const CampaignCreate = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -122,6 +125,13 @@ const CampaignCreate = () => {
     return true; // Last step is always valid
   };
 
+  const handleAIGenerate = (generatedCampaign) => {
+    setFormData(prev => ({
+      ...prev,
+      ...generatedCampaign
+    }));
+  };
+
   return (
     <>
       <PageHeader
@@ -136,6 +146,20 @@ const CampaignCreate = () => {
 
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Paper sx={{ p: 4, mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              {steps[activeStep]}
+            </Typography>
+            <Button
+              startIcon={<AIIcon />}
+              onClick={() => setAiDialogOpen(true)}
+              variant="outlined"
+              color="primary"
+            >
+              Generate with AI
+            </Button>
+          </Box>
+
           <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
             {steps.map((label) => (
               <Step key={label}>
@@ -417,6 +441,12 @@ const CampaignCreate = () => {
           </form>
         </Paper>
       </Container>
+
+      <AICampaignGenerator
+        open={aiDialogOpen}
+        onClose={() => setAiDialogOpen(false)}
+        onApply={handleAIGenerate}
+      />
     </>
   );
 };

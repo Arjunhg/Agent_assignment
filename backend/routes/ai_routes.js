@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { chat } = require('../controllers/ai_controller');
+const { protect } = require('../middleware/auth');
+const { generateCampaign } = require('../controllers/ai_controller');
 
-router.post('/chat', chat);
+router.post('/generate-campaign', protect, generateCampaign);
 
-module.exports = router; 
+module.exports = router;

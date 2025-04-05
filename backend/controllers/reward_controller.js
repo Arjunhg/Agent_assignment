@@ -1,6 +1,7 @@
 const Reward = require('../models/Reward');
 const Referral = require('../models/Referral');
 const Campaign = require('../models/Campaign');
+const { sendEmail } = require('../services/emailService');
 
 // Create a new reward
 exports.createReward = async (req, res, next) => {
@@ -50,6 +51,15 @@ exports.createReward = async (req, res, next) => {
       });
     }
 
+    // Check conversion requirements
+    const conversions = referral.referred.filter(r => r.status === 'converted').length;
+    if (conversions < referral.campaign.requiredConversions) {
+      return res.status(400).json({
+        success: false,
+        message: `Need ${referral.campaign.requiredConversions} conversions, has ${conversions}`
+      });
+    }
+
     // Create the reward
     const reward = await Reward.create({
       referrer: referral.referrer,
@@ -67,6 +77,15 @@ exports.createReward = async (req, res, next) => {
     // Update referral to mark reward as claimed
     referral.rewardClaimed = true;
     await referral.save();
+
+    // Notify referrer
+    if (referral.referrer.email) {
+      await sendEmail(
+        referral.referrer.email,
+        'rewardCreated',
+        [reward.type, reward.value, referral.campaign.name]
+      );
+    }
 
     res.status(201).json({
       success: true,

@@ -84,16 +84,16 @@ const Login = () => {
         setError("");
 
         try {
-            const { data } = await axios.post(`${BACKEND_URL}/api/auth/login`, { email, password });
+            const response = await axios.post(`${BACKEND_URL}/api/auth/login`, { email, password });
 
-            if (data.success) {
-                login(data);
+            if (response.data.success) {
+                login(response.data);
                 navigate("/dashboard");
             } else {
-                setError(data.message || "Invalid email or password");
+                setError(response.data.message || "Invalid email or password");
             }
         } catch (error) {
-            setError(error.response?.data?.message || "Something went wrong. Please try again.");
+            setError(error.response?.data?.message || "Something went wrong");
         } finally {
             setLoading(false);
         }

@@ -249,3 +249,29 @@ exports.deleteCampaign = async (req, res, next) => {
     next(err);
   }
 };
+
+// Add automated campaign status updates
+exports.updateCampaignStatuses = async () => {
+  const now = new Date();
+  
+  // Update expired campaigns
+  await Campaign.updateMany(
+    {
+      status: 'active',
+      endDate: { $lt: now }
+    },
+    { 
+      status: 'completed',
+      completedAt: now
+    }
+  );
+
+  // Activate scheduled campaigns
+  await Campaign.updateMany(
+    {
+      status: 'scheduled',
+      startDate: { $lte: now }
+    },
+    { status: 'active' }
+  );
+};

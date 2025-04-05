@@ -171,3 +171,56 @@ exports.chat = async (req, res) => {
       });
     }
   };
+
+// Generate campaign
+exports.generateCampaign = async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a prompt'
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const result = await model.generateContent(`
+      Create a referral marketing campaign based on the following requirements. 
+      Return only a valid JSON object (no markdown, no backticks) with these fields:
+      {
+        "name": "Campaign name",
+        "description": "Detailed campaign description",
+        "rewardType": "discount" or "payout",
+        "rewardValue": number,
+        "discountCode": "string if rewardType is discount",
+        "payoutMethod": "ach", "venmo", or "paypal" if rewardType is payout,
+        "status": "draft",
+        "startDate": "YYYY-MM-DD",
+        "endDate": "YYYY-MM-DD",
+        "aiFollowUpEnabled": true or false,
+        "followUpFrequency": "daily", "weekly", "monthly"
+      }
+
+      Requirements: ${prompt}
+
+      Important: Return ONLY the JSON object, no additional text or formatting.
+    `);
+
+    const response = await result.response;
+    const text = response.text().trim();
+    const campaignData = JSON.parse(text);
+
+    res.status(200).json({
+      success: true,
+      campaign: campaignData
+    });
+  } catch (error) {
+    console.error('AI Campaign Generation Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error generating campaign. Please ensure the AI response is valid JSON.'
+    });
+  }
+};

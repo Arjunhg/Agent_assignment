@@ -2,12 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
 
-
 const { 
-  uploadCSV, 
+  uploadCSV
 } = require('../controllers/upload_controller');
 
 // Routes
-router.post('/', protect,  uploadCSV );
+router.post('/', protect, uploadCSV);
 
-module.exports = router; 
+module.exports = router;
